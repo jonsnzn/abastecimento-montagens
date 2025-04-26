@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Abastecimento Montagens</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      font-family: 'Inter', sans-serif;
+      background-color: #f4f6f8;
+      color: #333;
+      text-align: center;
+      overflow: hidden;
+    }
+    body.alert-mode {
+      animation: screen-alert 1s infinite; /* Removido fundo vermelho */
+    }
+    @keyframes screen-alert {
+      0%, 100% { background-color: transparent; } /* Mantido fundo original */
+      50% { background-color: transparent; }
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+    @keyframes critical-flash {
+      0%, 100% { background-color: #8B0000; }
+      50% { background-color: #FF0000; }
+    }
+
+    header {
+      background-color: #1f2937;
+      padding: 20px;
+      color: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      margin: 0;
+      font-size: 46px;
+    }
+    .dev {
+      font-size: 18px;
+      margin-top: 10px;
+      color: #ffffff;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+      padding: 40px;
+      width: 100%;
+      max-width: 100%;
+      margin: 0 auto;
+      overflow-y: auto;
+      justify-content: center;
+    }
+    .box {
+      background-color: #e5e7eb;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.06);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      transition: background-color 0.5s ease, box-shadow 0.3s ease;
+      border: 2px solid transparent;
+      height: auto;
+      min-height: 200px;
+      max-height: 350px;
+      overflow: hidden;
+    }
+    .box.active {
+      animation: pulse 2s infinite; /* Aumentei a duração para 2s */
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+    }
+    .box.red.active {
+      animation: critical-flash 1s infinite, pulse 2s infinite;
+      color: white !important;
+    }
+    .box h2 {
+      margin: 0;
+      font-size: 100px;
+      font-weight: 900;
+      letter-spacing: 3px;
+    }
+    .box h4 {
+      margin: 5px 0 0;
+      font-size: 48px;
+      font-weight: 900;
+    }
+    .box p {
+      margin-top: 10px;
+      font-size: 60px;
+      font-family: 'Arial Black', Arial, sans-serif;
+      letter-spacing: 8px;
+      width: 100%;
+      text-align: center;
+    }
+    .clock {
+      font-size: 120px;
+      margin: 10px 0;
+      color: #ffffff;
+      font-weight: 900;
+    }
+    footer {
+      margin-top: 40px;
+      font-size: 14px;
+      color: #888;
+    }
+
+    .box.green { background-color: #008000; }
+    .box.yellow { background-color: #FFD700; }
+    .box.red { background-color: #FF0000; }
+
+    .umbro { color: #003366 !important; }
+    .fila { color: #8B0000 !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Abastecimento Montagens</h1>
+    <div class="clock" id="clock">00:00:00</div>
+    <div class="dev">Desenvolvimento Jon Neves</div>
+  </header>
+  <div class="grid" id="grid"></div>
+  <footer></footer>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBDrP0yzlFI4uwjbHZ5PhriCS3kzu9qTZ4",
+      authDomain: "painel-abastecimento.firebaseapp.com",
+      databaseURL: "https://painel-abastecimento-default-rtdb.firebaseio.com",
+      projectId: "painel-abastecimento",
+      storageBucket: "painel-abastecimento.firebasestorage.app",
+      messagingSenderId: "604396517014",
+      appId: "1:604396517014:web:f63eaa270718b69f9334b7",
+      measurementId: "G-PNN37MWTE5"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const setores = [
+      { label: '3214', name: 'UMBRO' }, { label: '2414', name: 'UMBRO' },
+      { label: '2214', name: 'UMBRO' }, { label: '1414', name: 'FILA' },
+      { label: '1214', name: 'FILA' }, { label: '3114', name: 'UMBRO' },
+      { label: '2314', name: 'UMBRO' }, { label: '2114', name: 'UMBRO' },
+      { label: '1314', name: 'FILA' }, { label: '1114', name: 'FILA' }
+    ];
+
+    function formatTime(ms) {
+      const minutes = Math.floor(ms / 60000);
+      const seconds = Math.floor((ms % 60000) / 1000);
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function checkGlobalAlert() {
+      const boxes = document.querySelectorAll('.box');
+      const alerta = Array.from(boxes).some(box =>
+        box.classList.contains('active') && box.classList.contains('red')
+      );
+      document.body.classList.toggle('alert-mode', alerta);
+    }
+
+    function createBox(sector) {
+      const box = document.createElement('div');
+      box.className = 'box';
+
+      const title = document.createElement('h2');
+      title.textContent = sector.label;
+
+      const subtitle = document.createElement('h4');
+      subtitle.textContent = sector.name;
+      subtitle.classList.add(sector.name.toLowerCase());
+
+      const timerLabel = document.createElement('p');
+      timerLabel.classList.add('timer');
+      timerLabel.style.display = 'none';
+      timerLabel.textContent = '00:00';
+
+      let isActive = false;
+      let timeMs = 0;
+      let interval = null;
+
+      const updateTextColor = (color) => {
+        if (color === 'green' || color === 'red') {
+          title.style.color = '#ffffff';
+          timerLabel.style.color = '#ffffff';
+        } else if (color === 'yellow') {
+          title.style.color = '#000000';
+          timerLabel.style.color = '#000000';
+        }
+      };
+
+      function updateTimer() {
+        timeMs += 10;
+        timerLabel.textContent = formatTime(timeMs);
+
+        box.classList.remove('green', 'yellow', 'red');
+
+        if (timeMs <= 900000) {
+          box.classList.add('green');
+          updateTextColor('green');
+        } else if (timeMs <= 1800000) {
+          box.classList.add('yellow');
+          updateTextColor('yellow');
+        } else {
+          box.classList.add('red');
+          updateTextColor('red');
+        }
+
+        setTimeout(checkGlobalAlert, 100);
+      }
+
+      const setorRef = ref(db, `setores/${sector.label}`);
+
+      onValue(setorRef, (snapshot) => {
+        const ativo = snapshot.val()?.ativo || false;
+        if (ativo && !isActive) {
+          if (interval) clearInterval(interval);
+          isActive = true;
+          timeMs = 0;
+          box.classList.add('active');
+          timerLabel.style.display = 'block';
+          interval = setInterval(updateTimer, 10);
+        } else if (!ativo && isActive) {
+          isActive = false;
+          clearInterval(interval);
+          timeMs = 0;
+          timerLabel.textContent = '00:00';
+          timerLabel.style.display = 'none';
+          box.classList.remove('active', 'green', 'yellow', 'red');
+          title.style.color = '';
+          timerLabel.style.color = '';
+          checkGlobalAlert();
+        }
+      });
+
+      box.addEventListener('click', () => {
+        set(setorRef, { ativo: !isActive });
+      });
+
+      box.appendChild(title);
+      box.appendChild(subtitle);
+      box.appendChild(timerLabel);
+
+      return box;
+    }
+
+    const grid = document.getElementById('grid');
+    setores.forEach(sector => grid.appendChild(createBox(sector)));
+
+    function updateClock() {
+      const clock = document.getElementById('clock');
+      const update = () => clock.textContent = new Date().toLocaleTimeString('pt-BR');
+      update();
+      setInterval(update, 1000);
+    }
+
+    function openFullscreen() {
+      const elem = document.documentElement;
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen().catch(() => {});
+      } else if (elem.webkitRequestFullscreen) {
+        elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) {
+        elem.msRequestFullscreen();
+      }
+    }
+
+    window.addEventListener('load', () => {
+      openFullscreen();
+      updateClock();
+    });
+  </script>
+</body>
+</html>
