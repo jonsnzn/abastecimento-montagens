@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Abastecimento Montagens</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      font-family: 'Inter', sans-serif;
+      background-color: #f4f6f8;
+      color: #333;
+      text-align: center;
+      overflow: hidden;
+    }
+    header {
+      background-color: #1f2937;
+      padding: 20px;
+      color: white;
+    }
+    h1 {
+      margin: 0;
+      font-size: 46px;
+    }
+    .dev {
+      font-size: 18px;
+      margin-top: 10px;
+      color: #FFD700;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+      padding: 40px;
+      width: 100%;
+      max-width: 100%;
+      margin: 0 auto;
+      overflow-y: auto;
+      justify-content: center;
+    }
+    .box {
+      background-color: #e5e7eb;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.5s ease;
+      border: 2px solid transparent;
+      min-height: 200px;
+    }
+    .box h2 {
+      margin: 0;
+      font-size: 100px;
+      font-weight: 900;
+      letter-spacing: 3px;
+    }
+    .box h4 {
+      margin: 5px 0 0;
+      font-size: 48px;
+      font-weight: 900;
+    }
+    .box p.timer {
+      margin-top: 10px;
+      font-size: 60px;
+      font-family: 'Arial Black', Arial, sans-serif;
+      letter-spacing: 8px;
+      display: none;
+    }
+    .clock {
+      font-size: 120px;
+      margin: 10px 0;
+      color: #ffffff;
+      font-weight: 900;
+    }
+
+    /* cor dos quadrados */
+    .box.green { background-color: #008000; color: white; }   /* ok */
+    .box.yellow { background-color: #FFD700; color: black; }  /* meio alerta */
+    .box.red { background-color: #FF0000; color: white; }     /* tá demorando */
+    .box.inactive { background-color: #333; color: #888; }    /* desligado */
+
+    /* cor do nome da marca */
+    .umbro { color: #003366 !important; }
+    .fila { color: #8B0000 !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Abastecimento Montagens</h1>
+    <div class="clock" id="clock">00:00:00</div>
+    <div class="dev">Pensado e Desenvolvido por João Neves</div>
+    <div class="dev" style="margin-top: 4px; color: #ffffff;">Grupo Dass</div>
+  </header>
+  <div class="grid" id="grid"></div>
+
+  <script>
+    /*
+      painel de abastecimento montagens
+      feito meio corrido mas ta funcionando
+      pega os status do flask e muda as cores
+      relogio tbm ta ai em cima
+      qualquer coisa falar com joao.neves@grupodass.com.br
+    */
+
+    // setores fixos, se mudar tem q vir aqui e add
+    const setores = [
+      { label: '3214', name: 'UMBRO' },
+      { label: '2414', name: 'UMBRO' },
+      { label: '2214', name: 'UMBRO' },
+      { label: '1414', name: 'FILA' },
+      { label: '1214', name: 'FILA' },
+      { label: '3114', name: 'UMBRO' },
+      { label: '2314', name: 'UMBRO' },
+      { label: '2114', name: 'UMBRO' },
+      { label: '1314', name: 'FILA' },
+      { label: '1114', name: 'FILA' }
+    ];
+
+    // formata segundos p/ mostrar tipo 01:30
+    function formatTime(seconds) {
+      const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+      const s = String(seconds % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    // monta os quadradinhos na tela, um p/ cada célula
+    function createBox(setor) {
+      const box = document.createElement('div');
+      box.className = 'box';
+      box.id = `box-${setor.label}`;
+
+      const title = document.createElement('h2');
+      title.textContent = setor.label;
+
+      const subtitle = document.createElement('h4');
+      subtitle.textContent = setor.name;
+      subtitle.classList.add(setor.name.toLowerCase());
+
+      const timerLabel = document.createElement('p');
+      timerLabel.classList.add('timer');
+      timerLabel.id = `timer-${setor.label}`;
+      timerLabel.textContent = '00:00';
+
+      box.appendChild(title);
+      box.appendChild(subtitle);
+      box.appendChild(timerLabel);
+
+      return box;
+    }
+
+    // pega os dados do servidor e muda as cores dos quadrados
+    // se tiver parado fica vermelho, se tiver normal fica verde
+    async function atualizar() {
+      try {
+        const res = await fetch("http://localhost:5000/status");
+        const data = await res.json();
+        data.forEach(setor => {
+          const box = document.getElementById(`box-${setor.codigo}`);
+          const timerLabel = document.getElementById(`timer-${setor.codigo}`);
+          const tempo = setor.tempo_segundos || 0;
+
+          box.classList.remove('green', 'yellow', 'red', 'inactive');
+          timerLabel.style.display = 'none';
+
+          if (!setor.ativo) {
+            box.classList.add('inactive');
+          } else {
+            if (tempo < 900) box.classList.add('green');
+            else if (tempo < 1800) box.classList.add('yellow');
+            else box.classList.add('red');
+            timerLabel.textContent = formatTime(tempo);
+            timerLabel.style.display = 'block';
+          }
+        });
+      } catch (e) {
+        // deu erro aqui = não conseguiu puxar os dados
+        console.error("Erro ao buscar dados:", e);
+      }
+    }
+
+    // relogio do topo
+    function updateClock() {
+      const clock = document.getElementById('clock');
+      const update = () => clock.textContent = new Date().toLocaleTimeString('pt-BR');
+      update();
+      setInterval(update, 1000);
+    }
+
+    const grid = document.getElementById('grid');
+
+    // cria os quadrados
+    setores.forEach(s => grid.appendChild(createBox(s)));
+
+    // atualiza tudo d 2 em 2 seg
+    setInterval(atualizar, 2000);
+
+    // inicia o relogio e atualiza a 1ª vez
+    updateClock();
+    atualizar();
+  </script>
+</body>
+</html>
